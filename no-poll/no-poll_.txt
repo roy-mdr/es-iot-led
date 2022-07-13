@@ -1,0 +1,103 @@
+#include <ESP8266WiFi.h>
+
+const char* ssid = "estudio-casa";
+const char* password = "123581321d1235";
+
+const char* host = "estudiosustenta.myds.me";
+//const char* host = "192.168.1.80";
+const char* path = "/test/WeMosServer/controll/subscribe.php?wid=0000";
+const int port = 80;
+
+// Declaramos o instanciamos un cliente que se conectará al Host
+WiFiClient client;
+
+void setup()
+{
+  Serial.begin(115200);
+  Serial.println();
+
+  pinMode(LED_BUILTIN, OUTPUT);     // Initialize the LED_BUILTIN pin as an output
+
+  Serial.printf("Connecting to %s ", ssid);
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println(" connected");
+}
+
+
+void loop()
+{
+  Serial.printf("\n[Connecting to %s ... ", host);
+  // Intentamos conectarnos
+  if (client.connect(host, port))
+  {
+    Serial.println("connected]");
+
+    Serial.println("[Sending a request]");
+    
+    ///// ---------- BEGIN
+    client.print(String("GET ") + path + " HTTP/1.1\r\n" +
+                 "Host: " + host + "\r\n" +
+                 "Connection: keep-alive\r\n" +
+                 "\r\n"
+                );
+
+    Serial.println("[Response:]");
+    
+    const char *separator = "''";
+    String mem = "";
+    bool headersDone = false;
+    bool readStr = false;
+    String payload = "";
+    
+    // Mientras la conexion perdure
+    while (client.connected()) {
+      yield(); // = delay(0);
+      // Si existen datos disponibles
+      if (client.available())
+      {
+        String line = client.readStringUntil('\n');
+        if ( (line.length() == 1) && (line[0] == '\r') ) {
+          if (headersDone) {
+            client.stop();
+          }
+          Serial.println("---[HEADERS END]---");
+          headersDone = true;
+          readStr = false;
+        } else {
+          
+          if (headersDone) {
+            if (readStr) {
+              ///// START LOGIC
+              //Serial.println(line);
+              if (line[32] == '+') {
+                Serial.println("on");
+                digitalWrite(LED_BUILTIN, LOW);   // Turn the LED on
+              }
+              if (line[32] == '-') {
+                Serial.println("off");
+                digitalWrite(LED_BUILTIN, HIGH);   // Turn the LED off
+              }
+            }
+            readStr = !readStr;
+          }
+          
+        }
+      }
+    }
+    ///// ---------- END
+    
+    // Una vez el servidor envia todos los datos requeridos se desconecta y el programa continua
+    client.stop();
+    Serial.println("\n[Disconnected]");
+  }
+  else
+  {
+    Serial.println("connection failed!]");
+    client.stop();
+  }
+}
