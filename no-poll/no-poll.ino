@@ -35,6 +35,8 @@ ESP8266WebServer server(80);
 
 // *************************************** CONFIG "no_poll_subscriber"
 
+#include <NoPollSubscriber.h>
+
 #define SUB_HOST "notify.estudiosustenta.myds.me"
 #define SUB_PORT 80
 // #define SUB_HOST "192.168.1.72"
@@ -44,12 +46,6 @@ ESP8266WebServer server(80);
 // Declaramos o instanciamos un cliente que se conectará al Host
 WiFiClient sub_WiFiclient;
 
-/***** SET CONNECTION TIMEOUT *****/
-unsigned long to_timestamp = millis();
-unsigned int  to_track = 0;
-unsigned int  to_times = 0;
-unsigned int  to_timeout = 60 * 1000; // 60 seconds
-
 // ***************************************
 
 
@@ -57,7 +53,7 @@ unsigned int  to_timeout = 60 * 1000; // 60 seconds
 // *************************************** CONFIG THIS SKETCH
 
 #define PIN_LED_OUTPUT 5 // Pin de LED que va a ser controlado // before was LED_BUILTIN instead of 5
-#define PIN_LED_CTRL 15 // Pin que cambia/constrola el estado del LED en PIN_LED_OUTPUT manualmente (TOGGLE LED si cambia a HIGH), si se presiona mas de 2 degundos TOGGLE el modo AP y STA+AP
+#define PIN_LED_CTRL 15 // Pin que cambia/controla el estado del LED en PIN_LED_OUTPUT manualmente (TOGGLE LED si cambia a HIGH), si se presiona mas de 2 degundos TOGGLE el modo AP y STA+AP
 
 byte PIN_LED_CTRL_VALUE;
 
@@ -314,6 +310,9 @@ bool requestLast() {
 
 void onParsed(String line) {
 
+  Serial.print("Got JSON: ");
+  Serial.println(line);
+
   if (line[2] != '0') { // PREVENT BUG WHEN NOOP SIGNAL IS SENT (''0'')
                 
     if (line[line.length() - 5] == '0') {
@@ -355,6 +354,13 @@ ESP.restart(); // tells the SDK to reboot, not as abrupt as ESP.reset()
 
 }
 
+/////////////////////////////////////////////////
+////////////// ON-CONNECTED LOGIC //////////////
+
+void onConnected() {
+  requestLast();
+}
+
 
 
 
@@ -394,7 +400,7 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
 
-  handleNoPollSubscription(sub_WiFiclient);
+  handleNoPollSubscription(sub_WiFiclient, SUB_HOST, SUB_PORT, SUB_PATH, "POST", String("{\"clid\":\"") + clid + "\",\"ep\":[\"wid-0001/request\",\"controll/led/ctrl_wemos0001/req\"]}", "wid0001/2021", doInLoop, onConnected, onParsed);
   
 }
 
@@ -402,155 +408,4 @@ void loop() {
 
 
 
-///////////////////////////////////////////////////////////////////////////////////////////////////
-/////////////////////////////// LETS TAKE THIS TO IT'S OWN LIBRARY! ///////////////////////////////
-
-// callback: doInLoop()
-// callback: onConnected()
-// callback: onParsed()
-
-// configure POST data (to connecto to broker) (and user agent)
-
-
-void handleNoPollSubscription(WiFiClient client) {
-
-  /***** RUN LOGIC IN LOOP *****/
-  doInLoop();
-  /***** ----------------- *****/
-  //Serial.println("loop_doInLoop");
-
-  if (WiFi.status() == WL_CONNECTED) {
-    // Do while WiFi is connected
-    
-    Serial.printf("\n[Connecting to %s ... ", SUB_HOST);
-    // Intentamos conectarnos
-    if (client.connect(SUB_HOST, SUB_PORT)) {
-      Serial.println("connected]");
-
-      /*** DO ON-CONNECTED CALLBACK ***/
-      requestLast();
-
-      String dataPOST = String("{\"clid\":\"") + clid + "\",\"ep\":[\"wid-0001/request\",\"controll/led/ctrl_wemos0001/req\"]}";
-      Serial.println("[Sending POST request]");
-      
-      ///// ---------- BEGIN CONNECTION
-      client.print("POST ");
-      client.print(SUB_PATH);
-      client.println(" HTTP/1.1");
-      
-      client.print("Host: ");
-      client.println(SUB_HOST);
-      
-      client.println("User-Agent: wid0001/2021");
-      
-      client.println("Accept: */*");
-      
-      client.println("Content-Type: application/json");
-
-      client.print("Content-Length: ");
-      client.println(dataPOST.length());
-      client.println();
-      client.print(dataPOST);
-
-      Serial.println("[Response:]");
-
-      bool headersDone = false;
-      bool readStr = false;
-
-      // Mientras la conexion perdure
-      while (client.connected()) {
-
-        if ( millis() != to_timestamp ) { // "!=" intead of ">" tries to void possible bug when millis goes back to 0
-          to_track++;
-          to_timestamp = millis();
-        }
-
-        if ( to_track > to_timeout ) {
-          // DO TIMEOUT!
-          to_times++;
-          to_track = 0;
-          Serial.print("[timeout #");
-          Serial.print(to_times);
-          Serial.println("]");
-          client.stop();
-          
-          if (to_times > 2) {
-            
-            to_times = 0;
-            
-            if (WiFi.getMode() != WIFI_AP_STA) {
-              Serial.println("3 timeouts: restarting...");
-              // ESP.restart(); // tells the SDK to reboot, not as abrupt as ESP.reset()
-              WiFi.reconnect(); // just restart the wifi connection... why reboot the whole thing?
-            }
-            
-          }
-        }
-
-        /***** SAME FUNCTIONS IN LOOP *****/
-//yield(); // = delay(0);
-//Serial.println("loop_client_connected");
-        doInLoop();
-        /***** because this while loop hogs the loop *****/
-
-        // Si existen datos disponibles
-        if (client.available()) {
-          
-//Serial.println("loop_client_available");
-
-          to_track = 0;
-          //to_times = 0;
-
-          String line = client.readStringUntil('\n');
-          Serial.println(line);
-          
-          if ( (line.length() == 1) && (line[0] == '\r') ) {
-            if (headersDone) {
-              client.stop();
-            } else {
-              Serial.println("---[HEADERS END]---");
-              headersDone = true;
-              readStr = false;
-            }
-          } else {
-            if (headersDone) {
-              if (readStr) {
-                ///// START LOGIC
-                Serial.println("^^^^^");
-
-                /*** DO ON-PARSED CALLBACK ***/
-                onParsed(line);
-                
-              }
-              readStr = !readStr;
-            }
-
-
-          }
-        }
-      }
-      ///// ---------- END
-      
-      // Una vez el servidor envia todos los datos requeridos se desconecta y el programa continua
-      Serial.println("\n[Disconnecting...]");
-      client.stop();
-      Serial.println("\n[Disconnected]");
-    } else {
-      Serial.println("connection failed!]");
-      client.stop();
-
-      //***** IS THIS TOO ABRUPT? 🤔🤔🤔
-      if (WiFi.getMode() != WIFI_AP_STA) {
-        Serial.println("Can't connect: restarting...");
-        // ESP.restart(); // tells the SDK to reboot, not as abrupt as ESP.reset()
-        WiFi.reconnect(); // just restart the wifi connection... why reboot the whole thing?
-      }
-      //*****
-    }
-
-  } else {
-    // Do while WiFi is NOT connected
-    //Serial.println("disconnected");
-  }
-}
 
