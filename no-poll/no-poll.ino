@@ -14,6 +14,8 @@
 
 
 #include <ESP8266HTTPClient.h> // Uses core ESP8266WiFi.h internally
+#include <ArduinoJson.h>
+#include <ArduinoJson.hpp>
 
 
 
@@ -313,44 +315,69 @@ void onParsed(String line) {
   Serial.print("Got JSON: ");
   Serial.println(line);
 
-  if (line[2] != '0') { // PREVENT BUG WHEN NOOP SIGNAL IS SENT (''0'')
-                
-    if (line[line.length() - 5] == '0') {
-      Serial.println("Servidor pide cambiar LED a estado: off");
-      digitalWrite(PIN_LED_OUTPUT, LOW);   // Turn the LED on
-      Serial.println("Notifying LED status changed successfully...");
-      httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=false&info=changed_by_request&clid=" + clid);
-      Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&shout=true&log=changed_by_request___to_off&state_changed=true", "application/json", "{\"type\":\"change\", \"data\":0, \"whisper\":0}"));
-    }
 
-    if (line[line.length() - 5] == '1') {
-      Serial.println("Servidor pide cambiar LED a estado: on");
-      digitalWrite(PIN_LED_OUTPUT, HIGH);   // Turn the LED off
-      Serial.println("Notifying LED status changed successfully...");
-      httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=true&info=changed_by_request&clid=" + clid);
-      Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&shout=true&log=changed_by_request___to_on&state_changed=true", "application/json", "{\"type\":\"change\", \"data\":1, \"whisper\":0}"));
-    }
 
-    if (line[line.length() - 6] == 'x') {
-      Serial.print("Servidor solicita el estado actual del LED. Estado actual: ");
-      Serial.println(digitalRead(PIN_LED_OUTPUT));
-      if (digitalRead(PIN_LED_OUTPUT) == 1) {
-        httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=true&info=current_status_requested&clid=" + clid);
-        Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&log=current_status_requested___is_on", "application/json", "{\"type\":\"change\", \"data\":1, \"whisper\":0}"));
-      }
-      if (digitalRead(PIN_LED_OUTPUT) == 0) {
-        httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=false&info=current_status_requested&clid=" + clid);
-        Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&log=current_status_requested___is_off", "application/json", "{\"type\":\"change\", \"data\":0, \"whisper\":0}"));
-      }
+  ///// Deserialize JSON. from: https://arduinojson.org/v6/assistant
+  
+  // Stream& input;
 
+  StaticJsonDocument<64> filter;
+
+  JsonObject filter_e = filter.createNestedObject("e");
+  filter_e["type"] = true;
+  filter_e["detail"]["data"] = true;
+
+  StaticJsonDocument<128> doc;
+
+  DeserializationError error = deserializeJson(doc, line, DeserializationOption::Filter(filter));
+
+  if (error) {
+    Serial.print(F("deserializeJson() failed: "));
+    Serial.println(error.f_str());
+    return;
+  }
+
+  const char* e_type = doc["e"]["type"]; // event type
+
+  const char* e_detail_data = doc["e"]["detail"]["data"]; // event detail data
+
+  ///// End Deserialize JSON
+
+
+
+  if (strcmp(e_type, "led_write") == 0 && strcmp(e_detail_data, "ON") == 0) {
+    Serial.println("Servidor pide cambiar LED a estado: on");
+    digitalWrite(PIN_LED_OUTPUT, HIGH);   // Turn the LED off
+    Serial.println("Notifying LED status changed successfully...");
+    httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=true&info=changed_by_request&clid=" + clid);
+    Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&shout=true&log=changed_by_request___to_on&state_changed=true", "application/json", "{\"type\":\"change\", \"data\":1, \"whisper\":0}"));
+  }
+
+  if (strcmp(e_type, "led_write") == 0 && strcmp(e_detail_data, "OFF") == 0) {
+    Serial.println("Servidor pide cambiar LED a estado: off");
+    digitalWrite(PIN_LED_OUTPUT, LOW);   // Turn the LED on
+    Serial.println("Notifying LED status changed successfully...");
+    httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=false&info=changed_by_request&clid=" + clid);
+    Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&shout=true&log=changed_by_request___to_off&state_changed=true", "application/json", "{\"type\":\"change\", \"data\":0, \"whisper\":0}"));
+  }
+
+  if (strcmp(e_type, "led_read") == 0) {
+    Serial.print("Servidor solicita el estado actual del LED. Estado actual: ");
+    Serial.println(digitalRead(PIN_LED_OUTPUT));
+    if (digitalRead(PIN_LED_OUTPUT) == 1) {
+      httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=true&info=current_status_requested&clid=" + clid);
+      Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&log=current_status_requested___is_on", "application/json", "{\"type\":\"change\", \"data\":1, \"whisper\":0}"));
     }
+    if (digitalRead(PIN_LED_OUTPUT) == 0) {
+      httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=false&info=current_status_requested&clid=" + clid);
+      Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&log=current_status_requested___is_off", "application/json", "{\"type\":\"change\", \"data\":0, \"whisper\":0}"));
+    }
+  }
+
 /* PARA COMPROBAR QUE PASA SI SE REINICIA EL MODULO Y EN EL INTER CAMBIA EL ESTADO (EN WEB)
 Serial.println("restarting...");
 ESP.restart(); // tells the SDK to reboot, not as abrupt as ESP.reset()
 */
-  } else {
-    Serial.println("(NOOP)");
-  }
 
 }
 

@@ -21,7 +21,8 @@ This is the basic example of a actuator controlled by Estudio Sustenta's broker.
 - [ ] OTA updates para firmware (diseñar para device targeted)
 - [ ] ESP-NOW para crear mesh de dispositivos y sólo un cerebro conectado al broker
 - [ ] ping pong support on every device
-- [ ] Migrate to `nopoll` library [(to-do)](https://github.com/roy-mdr/es-iot-libs#to-dos)
+- [x] Parse payload with ArduinoJSON
+- [x] Migrate to `nopoll` library [(to-do)](https://github.com/roy-mdr/es-iot-libs#to-dos)
     - [ ] WebSockets Port en broker
     - [ ] Add HTTPS to broker
     - [ ] Firmar payload como autenticacion para broker (a demás de API key)
