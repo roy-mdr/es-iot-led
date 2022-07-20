@@ -321,13 +321,10 @@ void onParsed(String line) {
   
   // Stream& input;
 
-  StaticJsonDocument<64> filter;
+  StaticJsonDocument<16> filter;
+  filter["e"] = true;
 
-  JsonObject filter_e = filter.createNestedObject("e");
-  filter_e["type"] = true;
-  filter_e["detail"]["data"] = true;
-
-  StaticJsonDocument<128> doc;
+  StaticJsonDocument<192> doc;
 
   DeserializationError error = deserializeJson(doc, line, DeserializationOption::Filter(filter));
 
@@ -337,9 +334,12 @@ void onParsed(String line) {
     return;
   }
 
-  const char* e_type = doc["e"]["type"]; // event type
+  const char* e_type = doc["e"]["type"]; // "led_write"
 
-  const char* e_detail_data = doc["e"]["detail"]["data"]; // event detail data
+  JsonObject e_detail = doc["e"]["detail"];
+  const char* e_detail_device = e_detail["device"]; // "led_wemos0001"
+  int e_detail_whisper = e_detail["whisper"]; // 6058
+  const char* e_detail_data = e_detail["data"]; // "OFF"
 
   ///// End Deserialize JSON
 
@@ -350,7 +350,7 @@ void onParsed(String line) {
     digitalWrite(PIN_LED_OUTPUT, HIGH);   // Turn the LED off
     Serial.println("Notifying LED status changed successfully...");
     httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=true&info=changed_by_request&clid=" + clid);
-    Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&shout=true&log=changed_by_request___to_on&state_changed=true", "application/json", "{\"type\":\"change\", \"data\":1, \"whisper\":0}"));
+    Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=" + e_detail_device + "&shout=true&log=changed_by_request___to_on&state_changed=true", "application/json", String("{\"type\":\"change\", \"data\":1, \"whisper\":") + String(e_detail_whisper) + "}"));
   }
 
   if (strcmp(e_type, "led_write") == 0 && strcmp(e_detail_data, "OFF") == 0) {
@@ -358,7 +358,7 @@ void onParsed(String line) {
     digitalWrite(PIN_LED_OUTPUT, LOW);   // Turn the LED on
     Serial.println("Notifying LED status changed successfully...");
     httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=false&info=changed_by_request&clid=" + clid);
-    Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&shout=true&log=changed_by_request___to_off&state_changed=true", "application/json", "{\"type\":\"change\", \"data\":0, \"whisper\":0}"));
+    Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=" + e_detail_device + "&shout=true&log=changed_by_request___to_off&state_changed=true", "application/json", String("{\"type\":\"change\", \"data\":0, \"whisper\":") + String(e_detail_whisper) + "}"));
   }
 
   if (strcmp(e_type, "led_read") == 0) {
@@ -366,11 +366,11 @@ void onParsed(String line) {
     Serial.println(digitalRead(PIN_LED_OUTPUT));
     if (digitalRead(PIN_LED_OUTPUT) == 1) {
       httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=true&info=current_status_requested&clid=" + clid);
-      Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&log=current_status_requested___is_on", "application/json", "{\"type\":\"change\", \"data\":1, \"whisper\":0}"));
+      Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=" + e_detail_device + "&log=current_status_requested___is_on", "application/json", String("{\"type\":\"change\", \"data\":1, \"whisper\":") + String(e_detail_whisper) + "}"));
     }
     if (digitalRead(PIN_LED_OUTPUT) == 0) {
       httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=false&info=current_status_requested&clid=" + clid);
-      Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&log=current_status_requested___is_off", "application/json", "{\"type\":\"change\", \"data\":0, \"whisper\":0}"));
+      Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=" + e_detail_device + "&log=current_status_requested___is_off", "application/json", String("{\"type\":\"change\", \"data\":0, \"whisper\":") + String(e_detail_whisper) + "}"));
     }
   }
 
@@ -427,7 +427,7 @@ void setup() {
 void loop() {
   // put your main code here, to run repeatedly:
 
-  handleNoPollSubscription(sub_WiFiclient, SUB_HOST, SUB_PORT, SUB_PATH, "POST", String("{\"clid\":\"") + clid + "\",\"ep\":[\"wid-0001/request\",\"controll/led/ctrl_wemos0001/req\"]}", "wid0001/2021", doInLoop, onConnected, onParsed);
+  handleNoPollSubscription(sub_WiFiclient, SUB_HOST, SUB_PORT, SUB_PATH, "POST", String("{\"clid\":\"") + clid + "\",\"ep\":[\"wid-0001/request\",\"controll/led/ctrl_wemos0001/req\"]}", "wid0001/2022", doInLoop, onConnected, onParsed);
   
 }
 
