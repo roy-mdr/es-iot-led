@@ -218,7 +218,7 @@ void doInLoop() {
             break;
           case WIFI_AP_STA: // case 3:
             //Serial.println("Station and Access Point (STA+AP)");
-            ESP_STATION(server);
+            ESP_STATION(server, true);
             break;
           default:
             Serial.print("WiFi mode NPI xD: ");
@@ -408,7 +408,7 @@ void setup() {
 
   setupWifiConfigServer(server, EEPROM_ADDR_CONNECTED_SSID, EEPROM_ADDR_CONNECTED_PASSWORD);
 
-  ESP_STATION(server); // Start in AP mode
+  ESP_STATION(server, true); // Start in AP mode
   /*** START SERVER ANYWAY XD ***/
   //Serial.println("Starting server anyway xD ...");
   //ESP_AP_STA(server, AP_SSID, AP_PASSWORD);
