@@ -1,8 +1,8 @@
 /*****************************************************************************/
 /*****************************************************************************/
 /*               STATUS: WORKING                                             */
-/*            TESTED IN: NodeMCU v3                                          */
-/*                   AT: 2022.07.19                                          */
+/*            TESTED IN: WeMos D1 mini                                       */
+/*                   AT: 2022.07.29                                          */
 /*     LAST COMPILED IN: PHI                                                 */
 /*****************************************************************************/
 /*****************************************************************************/
@@ -155,6 +155,70 @@ String httpPost(String url, String contentType, String data) {
 ///////////////////////////////////////////// HELPERS /////////////////////////////////////////////
 
 /////////////////////////////////////////////////
+//////////////// KEEP-ALIVE LOOP ////////////////
+
+int connId;
+String connSecret;
+long connTimeout;
+bool runAliveLoop = false;
+
+/***** SET TIMEOUT *****/
+unsigned long al_timestamp = millis();
+/*unsigned int  al_times = 0;*/
+unsigned long  al_timeout = 0;
+unsigned int  al_track = 0; // al_track = al_timeout; TO: execute function and then start counting
+
+void handleAliveLoop() {
+
+  if (!runAliveLoop) {
+    return;
+  }
+
+  al_timeout = connTimeout - 3000; // connTimeout - 3 seconds
+
+  if ( millis() != al_timestamp ) { // "!=" intead of ">" tries to void possible bug when millis goes back to 0
+    al_track++;
+    al_timestamp = millis();
+  }
+
+  if ( al_track > al_timeout ) {
+    // DO TIMEOUT!
+    /*al_times++;*/
+    al_track = 0;
+
+    // RUN THIS FUNCTION!
+    String response = httpPost(String("http://") + SUB_HOST + ":" + SUB_PORT + "/alive", "application/json", String("{\"connid\":") + connId + ",\"secret\":\"" + connSecret + "\"}");
+
+    ///// Deserialize JSON. from: https://arduinojson.org/v6/assistant
+
+    // Stream& response;
+
+    StaticJsonDocument<96> doc;
+
+    DeserializationError error = deserializeJson(doc, response);
+
+    if (error) {
+      Serial.print(F("deserializeJson() failed: "));
+      Serial.println(error.f_str());
+      runAliveLoop = false;
+      return;
+    }
+
+    int connid = doc["connid"]; // 757
+    const char* secret = doc["secret"]; // "zbUIE"
+    long timeout = doc["timeout"]; // 300000
+
+    ///// End Deserialize JSON
+
+    connId = connid;
+    connSecret = (String)secret;
+    connTimeout = timeout;
+    runAliveLoop = true;
+  }
+
+}
+
+/////////////////////////////////////////////////
 //////////////// DETECT CHANGES ////////////////
 
 bool changed(byte gotStat, byte &compareVar) {
@@ -185,6 +249,8 @@ bool changed(byte gotStat, byte &compareVar) {
 void doInLoop() {
 
   //Serial.println("loop");
+
+  handleAliveLoop();
   
   wifiConfigLoop(server);
 
@@ -343,12 +409,12 @@ void onParsed(String line) {
 
   ///// Deserialize JSON. from: https://arduinojson.org/v6/assistant
   
-  // Stream& input;
+  // Stream& line;
 
-  StaticJsonDocument<16> filter;
-  filter["e"] = true;
+  StaticJsonDocument<0> filter;
+  filter.set(true);
 
-  StaticJsonDocument<192> doc;
+  StaticJsonDocument<384> doc;
 
   DeserializationError error = deserializeJson(doc, line, DeserializationOption::Filter(filter));
 
@@ -358,9 +424,17 @@ void onParsed(String line) {
     return;
   }
 
-  const char* e_type = doc["e"]["type"]; // "led_write"
+  long long iat = doc["iat"]; // 1659077886875
+
+  const char* ep_requested = doc["ep"]["requested"]; // "@SERVER@"
+  const char* ep_emitted = doc["ep"]["emitted"]; // "@SERVER@"
+
+  const char* e_type = doc["e"]["type"]; // "info"
 
   JsonObject e_detail = doc["e"]["detail"];
+  int e_detail_connid = e_detail["connid"]; // 757
+  const char* e_detail_secret = e_detail["secret"]; // "zbUIE"
+  long e_detail_timeout = e_detail["timeout"]; // 300000
   const char* e_detail_device = e_detail["device"]; // "led_wemos0001"
   int e_detail_whisper = e_detail["whisper"]; // 6058
   const char* e_detail_data = e_detail["data"]; // "OFF"
@@ -396,6 +470,15 @@ void onParsed(String line) {
       httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=false&info=current_status_requested&clid=" + clid);
       Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=" + e_detail_device + "&log=current_status_requested___is_off", "application/json", String("{\"type\":\"change\", \"data\":0, \"whisper\":") + String(e_detail_whisper) + "}"));
     }
+  }
+
+
+
+  if (strcmp(ep_emitted, "@SERVER@") == 0) {
+    connId = e_detail_connid;
+    connSecret = (String)e_detail_secret;
+    connTimeout = e_detail_timeout;
+    runAliveLoop = true;
   }
 
 /* PARA COMPROBAR QUE PASA SI SE REINICIA EL MODULO Y EN EL INTER CAMBIA EL ESTADO (EN WEB)
