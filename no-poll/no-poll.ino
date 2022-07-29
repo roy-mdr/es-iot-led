@@ -283,7 +283,31 @@ bool requestLast() {
   Serial.print("Last value: ");
   Serial.print(lastValue);
 
-  if ( lastValue == "1" ) {
+
+
+  ///// Deserialize JSON. from: https://arduinojson.org/v6/assistant
+
+  // Stream& lastValue;
+  StaticJsonDocument<16> filter;
+  filter["value"] = true;
+
+  StaticJsonDocument<48> doc;
+
+  DeserializationError error = deserializeJson(doc, lastValue, DeserializationOption::Filter(filter));
+
+  if (error) {
+    Serial.print(F("deserializeJson() failed: "));
+    Serial.println(error.f_str());
+    return false;
+  }
+
+  const char* value = doc["value"]; // "ON" - "OFF"
+
+  ///// End Deserialize JSON
+
+
+
+  if ( strcmp(value, "ON") == 0 ) {
     Serial.println(" (on)");
     digitalWrite(PIN_LED_OUTPUT, HIGH);   // Turn the LED on
     Serial.println("Notifying we got the last value correctly...");
@@ -291,7 +315,7 @@ bool requestLast() {
     Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&shout=true&log=device_just_connected_to_broker_and_checked_last_status___is_on", "application/json", "{\"type\":\"change\", \"data\":1, \"whisper\":0}"));
     
     return true;
-  } else if ( lastValue == "0" ) {
+  } else if ( strcmp(value, "OFF") == 0 ) {
     Serial.println(" (off)");
     digitalWrite(PIN_LED_OUTPUT, LOW);   // Turn the LED off
     Serial.println("Notifying we got the last value correctly...");
