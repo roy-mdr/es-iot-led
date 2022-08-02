@@ -223,6 +223,9 @@ void handleAliveLoop() {
     connSecret = (String)secret;
     connTimeout = timeout;
     runAliveLoop = true;
+
+
+    updateControllerData();
   }
 
 }
@@ -250,6 +253,14 @@ bool changed(byte gotStat, byte &compareVar) {
     //compareVar = gotStat;
     return false;
   }
+}
+
+/////////////////////////////////////////////////
+//////////// UPDATE CONTROLLER DATA ////////////
+
+void updateControllerData() {
+  Serial.print("Updating controller data in server... ");
+  Serial.println(httpPost(String("http://") + PUB_HOST + "/controll/controller.php", "application/json", String("{\"controller\":\"") + clid + "\",\"ipv4_interface\":\"" + WiFi.localIP().toString().c_str() + "\"}"));
 }
 
 /////////////////////////////////////////////////
@@ -483,6 +494,7 @@ ESP.restart(); // tells the SDK to reboot, not as abrupt as ESP.reset()
 
 void onConnected() {
   requestLast();
+  updateControllerData();
 }
 
 
