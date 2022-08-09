@@ -64,7 +64,7 @@ WiFiClient sub_WiFiclient;
 // *************************************** CONFIG THIS SKETCH
 
 #define PIN_LED_OUTPUT 5 // Pin de LED que va a ser controlado // before was LED_BUILTIN instead of 5
-#define PIN_LED_CTRL 15 // Pin que cambia/controla el estado del LED en PIN_LED_OUTPUT manualmente (TOGGLE LED si cambia a HIGH), si se presiona mas de 2 degundos TOGGLE el modo AP y STA+AP
+#define PIN_LED_CTRL 15 // Pin que cambia/controla el estado del LED en PIN_LED_OUTPUT manualmente (TOGGLE LED si cambia a HIGH), si se presiona mas de 2 degundos TOGGLE el modo AP y STA+AP, si se presiona 10 segundos se borra toda la memoria EEPROM y se resetea el dispositivo.
 
 byte PIN_LED_CTRL_VALUE;
 
@@ -75,7 +75,7 @@ byte PIN_LED_CTRL_VALUE;
 unsigned long lc_timestamp = millis();
 unsigned int  lc_track = 0;
 unsigned int  lc_times = 0;
-unsigned int  lc_timeout = 2 * 1000; // 2 seconds
+unsigned int  lc_timeout = 10 * 1000; // 10 seconds
 
 // ***************************************
 
@@ -290,8 +290,9 @@ void doInLoop() {
       lc_track = 0;
 
       if (lc_times == 1) {
-        // TOGGLE SERVER STATUS
-        ESP_AP_TOGGLE(true);
+        // ERASE ALL EEPROM MEMORY AND RESTART
+        EEPROM_CLEAR();
+        ESP.reset();
       }
     }
   }
@@ -302,15 +303,12 @@ void doInLoop() {
     
     if (PIN_LED_CTRL_VALUE == 0) { // IF PIN_LED_CTRL WAS RELEASED
 
-      bool do_toggle = false; // this way is for resetting the state as fast as possible, to not get stuck waiting for HTTP requests...
-      if ( lc_times < 1 ) {
-        do_toggle = true;
-      }
+      unsigned int pushedTime = lc_track;
       
       lc_times = 0; // RESET COUNTER
       lc_track = 0; // RESET TIMER
 
-      if (do_toggle) { // IF PIN_LED_CTRL WAS PRESSED LESS THAN 2 SECONDS...
+      if (pushedTime < 2000) { // IF PIN_LED_CTRL WAS PRESSED LESS THAN 2 SECONDS...
         
         // TOGGLE LED STATUS
         digitalWrite(PIN_LED_OUTPUT, !digitalRead(PIN_LED_OUTPUT));
@@ -332,6 +330,11 @@ void doInLoop() {
           httpGet(String("http://") + PUB_HOST + "/test/WeMosServer/controll/response.php?set=" + led_state_string + "&info=pin_change_on_device&clid=" + clid);
           Serial.print(httpPost(String("http://") + PUB_HOST + "/controll/res.php?device=led_wemos0001&shout=true&log=pin_change_on_device&state_changed=true", "application/json", "{\"type\":\"change\", \"data\":" + led_state_string + ", \"whisper\":0}"));
         }
+      }
+
+      if ( (pushedTime >= 2000) && (pushedTime < lc_timeout) ) { // IF PIN_LED_CTRL WAS PRESSED FOR 2 SECONDS BUT LESS THAN THE TIMEOUT...
+        // TOGGLE SERVER STATUS
+        ESP_AP_TOGGLE(true);
       }
     }
   }
