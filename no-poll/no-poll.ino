@@ -64,7 +64,7 @@ WiFiClient sub_WiFiclient;
 
 // *************************************** CONFIG THIS SKETCH
 
-#define PIN_LED_OUTPUT LED_BUILTIN // Pin de LED que va a ser controlado // before was LED_BUILTIN instead of 5
+#define PIN_LED_OUTPUT 5 // Pin de LED que va a ser controlado // before was LED_BUILTIN instead of 5
 #define PIN_LED_CTRL 15 // Pin que cambia/controla el estado del LED en PIN_LED_OUTPUT manualmente (TOGGLE LED si cambia a HIGH), si se presiona mas de 2 degundos TOGGLE el modo AP y STA+AP, si se presiona 10 segundos se borra toda la memoria EEPROM y se resetea el dispositivo.
 
 byte PIN_LED_CTRL_VALUE;
@@ -519,7 +519,7 @@ void setup() {
   pinMode(PIN_LED_OUTPUT, OUTPUT); // Initialize as an output // To controll LED in this pin
   pinMode(PIN_LED_CTRL, INPUT);    // Initialize as an input // To toggle LED status manually and TOGGLE AP/STA+AP MODE (long press)
 
-  setupWifiConfigServer(server, EEPROM_ADDR_EARLY_UNPLUG, EEPROM_ADDR_CONNECTED_SSID, EEPROM_ADDR_CONNECTED_PASSWORD, AP_SSID, AP_PASSWORD);
+  setupWifiConfigServer(server, EEPROM_ADDR_EARLY_UNPLUG, EEPROM_ADDR_CONNECTED_SSID, EEPROM_ADDR_CONNECTED_PASSWORD, (char*)AP_SSID, (char*)AP_PASSWORD);
 
   /*** START SERVER ANYWAY XD ***/
   //Serial.println("Starting server anyway xD ...");
