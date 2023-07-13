@@ -2,8 +2,8 @@
 /*****************************************************************************/
 /*               STATUS: WORKING                                             */
 /*            TESTED IN: WeMos D1 mini                                       */
-/*                   AT: 2022.08.09                                          */
-/*     LAST COMPILED IN: PHI                                                 */
+/*                   AT: 2023.07.12                                          */
+/*     LAST COMPILED IN: KAPPA                                               */
 /*****************************************************************************/
 /*****************************************************************************/
 
@@ -23,7 +23,8 @@
 
 #include <config_wifi_roy.h>
 
-#define EEPROM_ADDR_CONNECTED_SSID 1       // Start saving connected network SSID from this memory address
+#define EEPROM_ADDR_EARLY_UNPLUG 1         // Start saving early-unplug counter from this memory address
+#define EEPROM_ADDR_CONNECTED_SSID 2       // Start saving connected network SSID from this memory address
 #define EEPROM_ADDR_CONNECTED_PASSWORD 30  // Start saving connected network Password from this memory address
 #define AP_SSID clid                       // Set your own Network Name (SSID)
 #define AP_PASSWORD "12345678"             // Set your own password
@@ -63,7 +64,7 @@ WiFiClient sub_WiFiclient;
 
 // *************************************** CONFIG THIS SKETCH
 
-#define PIN_LED_OUTPUT 5 // Pin de LED que va a ser controlado // before was LED_BUILTIN instead of 5
+#define PIN_LED_OUTPUT LED_BUILTIN // Pin de LED que va a ser controlado // before was LED_BUILTIN instead of 5
 #define PIN_LED_CTRL 15 // Pin que cambia/controla el estado del LED en PIN_LED_OUTPUT manualmente (TOGGLE LED si cambia a HIGH), si se presiona mas de 2 degundos TOGGLE el modo AP y STA+AP, si se presiona 10 segundos se borra toda la memoria EEPROM y se resetea el dispositivo.
 
 byte PIN_LED_CTRL_VALUE;
@@ -518,7 +519,7 @@ void setup() {
   pinMode(PIN_LED_OUTPUT, OUTPUT); // Initialize as an output // To controll LED in this pin
   pinMode(PIN_LED_CTRL, INPUT);    // Initialize as an input // To toggle LED status manually and TOGGLE AP/STA+AP MODE (long press)
 
-  setupWifiConfigServer(server, EEPROM_ADDR_CONNECTED_SSID, EEPROM_ADDR_CONNECTED_PASSWORD, AP_SSID, AP_PASSWORD);
+  setupWifiConfigServer(server, EEPROM_ADDR_EARLY_UNPLUG, EEPROM_ADDR_CONNECTED_SSID, EEPROM_ADDR_CONNECTED_PASSWORD, AP_SSID, AP_PASSWORD);
 
   /*** START SERVER ANYWAY XD ***/
   //Serial.println("Starting server anyway xD ...");
